@@ -1,0 +1,21 @@
+#pragma once
+
+#include <csignal>
+#include <boost/asio.hpp>
+#include <boost/beast.hpp>
+#include <string>
+#include <memory>
+#include <future>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <iostream>
+#include <boost/asio/connect.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/websocket.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <thread>
+#include <nlohmann/json.hpp>
+#include <stdexcept>
+#include <utility>
+#include <cstdlib>
