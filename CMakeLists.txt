@@ -14,7 +14,7 @@ elseif(WIN32)
 endif()
 
 # Project Name
-project(HackArena2.0-MonoTanks-Cxx)
+project(HackArena2.5-StereoTanks-Cxx)
 
 # Set C++ Standard
 set(CMAKE_CXX_STANDARD 20)
@@ -26,7 +26,7 @@ find_package(nlohmann_json REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
 # Add executable
-add_executable(HackArena2.0-MonoTanks-Cxx src/main.cpp
+add_executable(HackArena2.5-StereoTanks-Cxx src/main.cpp
         src/web-socket-client.cpp
         src/web-socket-client.h
         src/packet.h
@@ -37,17 +37,17 @@ add_executable(HackArena2.0-MonoTanks-Cxx src/main.cpp
         src/handler.cpp
         src/handler.h)
 
-target_precompile_headers(HackArena2.0-MonoTanks-Cxx PRIVATE src/pch.h)
+target_precompile_headers(HackArena2.5-StereoTanks-Cxx PRIVATE src/pch.h)
 
 # Define preprocessor macros
 if(WIN32)
-    target_compile_definitions(HackArena2.0-MonoTanks-Cxx PRIVATE _WIN32_WINDOWS=0x0A00)
+    target_compile_definitions(HackArena2.5-StereoTanks-Cxx PRIVATE _WIN32_WINDOWS=0x0A00)
 elseif(UNIX)
     # Unix-specific settings
 endif()
 
 # Link Boost libraries
-target_link_libraries(HackArena2.0-MonoTanks-Cxx PRIVATE Boost::system nlohmann_json::nlohmann_json)
+target_link_libraries(HackArena2.5-StereoTanks-Cxx PRIVATE Boost::system nlohmann_json::nlohmann_json)
 
 # Ensure static linking
 set(BOOST_USE_STATIC_LIBS ON)
