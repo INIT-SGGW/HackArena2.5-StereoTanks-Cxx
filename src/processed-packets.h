@@ -2,28 +2,45 @@
 
 #pragma once
 
+enum class TankType {
+	Light = 0,
+	Heavy = 1
+};
+
 /// First received list of players
 struct LobbyPlayer {
 	std::string id;
-	std::string nickname;
+	TankType tankType;
+};
+
+/// First received list of teams
+struct LobbyTeams {
+	std::string name;
 	uint32_t color;
+	std::vector<LobbyPlayer> players;
 };
 
 /// Player received at game end
 struct EndGamePlayer {
     std::string id;
-    std::string nickname;
-    uint32_t color;
-    int score;
+    int kills;
+    TankType tankType;
+};
+
+struct EndGameTeam {
+	std::string name;
+	uint32_t color;
+	int score;
+	std::vector<EndGamePlayer> players;
 };
 
 struct EndGameLobby {
-    std::vector<EndGamePlayer> players;
+    std::vector<EndGameTeam> teams;
 };
 
 struct LobbyData {
 	std::string myId;
-	std::vector<LobbyPlayer> players;
+	std::vector<LobbyTeams> teams;
     bool sandboxMode;
     std::optional<std::string> matchName;
 	int gridDimension;
@@ -49,7 +66,11 @@ struct Turret {
     /// Not present in enemies
 	std::optional<int> bulletCount;
     /// Not present in enemies
-	std::optional<int> ticksToRegenBullet;
+	std::optional<int> ticksToBullet;
+	/// Only in light tanks, not present in enemies
+	std::optional<int> ticksToDoubleBullet;
+	/// Only in heavy tanks, not present in enemies
+	std::optional<int> ticksToLaser;
 };
 
 enum class SecondaryItemType {
@@ -63,11 +84,17 @@ enum class SecondaryItemType {
 /// TankPayload struct
 struct Tank {
 	std::string ownerId;
+	TankType tankType;
     Direction direction;
 	Turret turret;
     /// Not present in enemies
 	std::optional<int> health;
-    std::optional<SecondaryItemType> secondaryItem;
+	/// Only in heavy tanks, not present in enemies
+	std::optional<int> ticksToMine;
+	/// Only in light tanks, not present in enemies
+	std::optional<int> ticksToRadar;
+	/// Only in light tanks
+	std::optional<bool> isUsingRadar;
 };
 
 enum class BulletType {
@@ -124,31 +151,23 @@ struct Zone {
 // Player struct
 struct Player {
 	std::string id;
-	std::string nickname;
-	uint32_t color;
 	int ping;
     /// Not present in enemies
 	std::optional<int> score;
-    /// Optional because it might be null
+    /// Optional because it might be null (it is present only if you are this player)
 	std::optional<int> ticksToRegen;
-    bool isUsingRadar;
+};
+
+struct Team {
+	std::string name;
+	uint32_t color;
+	std::optional<int> score;
+	std::vector<Player> players;
 };
 
 struct Wall {};
 
-enum class ItemType {
-    unknown = 0,
-    laser = 1,
-	doubleBullet = 2,
-    radar = 3,
-    mine = 4
-};
-
-struct Item {
-    ItemType type;
-};
-
-using TileVariant = std::variant<Wall, Tank, Bullet, Mine, Laser, Item>;
+using TileVariant = std::variant<Wall, Tank, Bullet, Mine, Laser>;
 
 struct Tile {
     std::vector<TileVariant> objects;
@@ -173,7 +192,7 @@ struct Map {
 struct GameState {
     /// tick number
 	int time;
-	std::vector<Player> players;
+	std::vector<Team> teams;
 	Map map;
 };
 
@@ -211,7 +230,39 @@ struct AbilityUse {
 
 struct Wait {};
 
-using ResponseVariant = std::variant<Rotate, Move, AbilityUse, Wait>;
+// For per-tile penalties
+struct PerTilePenalty {
+	int x;
+	int y;
+	float penalty;
+};
+
+// Penalties structure
+struct GotoPenalties {
+	float blindly = 5.0f;       // Default value
+	float bullet = 20.0f;       // Default value
+	float mine = 20.0f;         // Default value
+	float laser = 20.0f;        // Default value
+	std::vector<PerTilePenalty> perTile;
+};
+
+// Costs structure
+struct GotoCosts {
+	float forward = 1.0f;       // Default value
+	float backward = 1.5f;      // Default value
+	float rotate = 1.5f;        // Default value
+};
+
+// Complete GoTo structure
+struct GoTo {
+	int x;
+	int y;
+	std::optional<RotationDirection> turretRotation;
+	std::optional<GotoCosts> costs;
+	std::optional<GotoPenalties> penalties;
+};
+
+using ResponseVariant = std::variant<Rotate, Move, AbilityUse, Wait, GoTo>;
 
 enum class WarningType {
     CustomWarning,

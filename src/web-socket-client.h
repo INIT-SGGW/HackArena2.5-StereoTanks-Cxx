@@ -6,7 +6,7 @@
 
 class WebSocketClient {
  public:
-	WebSocketClient(std::string  host, std::string  port, std::string nickname, std::string  code);
+	WebSocketClient(std::string  host, std::string  port, std::string teamName, std::string tankType, std::string  code);
 	~WebSocketClient();
 
 	std::future<bool> Connect();
@@ -26,7 +26,8 @@ class WebSocketClient {
 
 	std::string host;
 	std::string port;
-	std::string nickname;
+	std::string tankType;
+	std::string teamName;
 	std::string code;
 
 	static boost::asio::io_context ioc;

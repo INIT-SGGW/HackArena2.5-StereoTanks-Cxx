@@ -22,3 +22,4 @@ class Handler {
 	std::mutex *mtxPtr;
 	std::condition_variable *cvPtr;
 };
+

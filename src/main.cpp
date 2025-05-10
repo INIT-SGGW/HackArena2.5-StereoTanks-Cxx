@@ -5,7 +5,8 @@ int main(int argc, char** argv) {
 	// Default values
 	std::string host = "localhost";
 	std::string port = "5000";
-	std::string nickname;
+	std::string teamName;
+	std::string tankType;
 	std::string code;
 
 	// Parse command line arguments into a map
@@ -26,11 +27,14 @@ int main(int argc, char** argv) {
 	// Update default values based on provided arguments
 	if (args.count("host")) host = args["host"];
 	if (args.count("port")) port = args["port"];
-	if (args.count("nickname")) nickname = args["nickname"];
+	if (args.count("teamName")) teamName = args["teamName"];
+	if (args.count("tankType")) tankType = args["tankType"];
 	if (args.count("code")) code = args["code"];
 
-    if (args.count("help") || nickname.empty()){
-        std::cout << "--nickname Nickname of the bot that will be displayed in the game.\nThis must be a unique identifier for the bot in the game environment.\nNicknames that are already in use or not unique will cause conflicts.\n--host The IP address or domain name of the server to connect to.\nThe bot will attempt to establish a connection to the specified host.\nIf not provided, it defaults to 'localhost'.\n--port The port on which the server is listening.\nThis specifies the port number that the server is using for communication.\nIf not provided, it defaults to port 5000.\n--code Optional access code required to join the server.\nIf the server enforces an access code for connections, it must be supplied here.\nIf no code is required, this can be left empty (default is an empty string)."
+	bool isValidTankType = (tankType == "light" || tankType == "heavy");
+
+	if (args.count("help") || teamName.empty() || tankType.empty() || !isValidTankType) {
+        std::cout << "--teamName Team Name that will be displayed in the game.\n--tankType Tank type that will be used in the game. light or heavy\n--host The IP address or domain name of the server to connect to.\nThe bot will attempt to establish a connection to the specified host.\nIf not provided, it defaults to 'localhost'.\n--port The port on which the server is listening.\nThis specifies the port number that the server is using for communication.\nIf not provided, it defaults to port 5000.\n--code Optional access code required to join the server.\nIf the server enforces an access code for connections, it must be supplied here.\nIf no code is required, this can be left empty (default is an empty string)."
                 << std::endl << std::flush;
         return EXIT_SUCCESS;
     };
@@ -38,14 +42,15 @@ int main(int argc, char** argv) {
 	// Print the values
 	std::cout << "Host: " << host << std::endl << std::flush;
 	std::cout << "Port: " << port << std::endl << std::flush;
-	std::cout << "Nickname: " << nickname << std::endl << std::flush;
+	std::cout << "Tank Type:" << tankType << std::endl << std::flush;
+	std::cout << "Team Name: " << teamName << std::endl << std::flush;
 	std::cout << "Code: " << code << std::endl << std::flush;
 
 	// Placeholder for actual websocket client logic
 	std::cout << "Starting client..." << std::endl << std::flush;
 
 	// Create the WebSocket client
-	WebSocketClient client(host, port, nickname, code);
+	WebSocketClient client(host, port, teamName, tankType, code);
 
 	std::signal(SIGINT, WebSocketClient::SignalHandler);
 

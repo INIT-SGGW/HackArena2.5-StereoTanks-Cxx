@@ -31,13 +31,6 @@ void Bot::PrintMap(const std::vector<std::vector<Tile>>& tiles) {
                         hasObject = true;
                         break; // Found tank, no need to check further
                     }
-                } else if (std::holds_alternative<Item>(object)) {
-                    if (auto itemPtr = std::get_if<Item>(&object)) {
-                        map[i][j] = (itemPtr->type == ItemType::radar) ? 'R' :
-                                    (itemPtr->type == ItemType::doubleBullet) ? 'D' :
-                                    (itemPtr->type == ItemType::mine) ? 'M' : 'L';
-                        hasObject = true;
-                    }
                 } else if (std::holds_alternative<Mine>(object)) {
                     map[i][j] = 'X';
                     hasObject = true;

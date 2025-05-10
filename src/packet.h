@@ -22,18 +22,23 @@ enum class PacketType {
     GameStarting = GameStatusGroup | 0x2,
     GameStarted = GameStatusGroup | 0x3,
     GameInProgress = GameStatusGroup | 0x4,
-    GameEnded = GameStatusGroup | HasPayload | 0x5,
+    GameEnd = GameStatusGroup | HasPayload | 0x5,
 
     GameStateGroup = 0x30,
     GameState = GameStateGroup | HasPayload | 0x2,
     ReadyToReceiveGameState = GameStateGroup | 0x5,
 
-    // Player response group (range: 0x40 - 0x4F)
+    // Player response group (range: 0x40 - 0x4E)
     PlayerResponseActionGroup = 0x40,
     TankMovement = PlayerResponseActionGroup | HasPayload | 0x1,
     TankRotation = PlayerResponseActionGroup | HasPayload | 0x2,
     AbilityUse = PlayerResponseActionGroup | HasPayload | 0x3,
     ResponsePass = PlayerResponseActionGroup | HasPayload | 0x7,
+    GoTo = PlayerResponseActionGroup | HasPayload | 0xE,
+
+    // Debug group (range: 0xD0 - 0xDF)
+    DebugGroup = 0xD0,
+    ChargeAbility = DebugGroup | 0xD,
 
     // Warning group (range: 0xE0 - 0xEF)
     WarningGroup = 0xE0,
@@ -47,6 +52,7 @@ enum class PacketType {
     InvalidPacketTypeError = ErrorGroup | 0x1,
     InvalidPacketUsageError = ErrorGroup | 0x2,
     InvalidPayloadError = ErrorGroup | 0x3,
+    InternalError = ErrorGroup | 0x7,
 };
 
 
@@ -54,4 +60,3 @@ struct Packet {
 	PacketType packetType;
 	nlohmann::json payload;
 };
-

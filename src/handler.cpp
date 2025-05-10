@@ -27,7 +27,51 @@ std::string Handler::ResponseToString(const ResponseVariant& response, std::stri
 	  } else if constexpr (std::is_same_v<T, Wait>) {
 		  jsonResponse["type"] = PacketType::ResponsePass;
           jsonResponse["payload"]["gameStateId"] = id;
-	  }
+	  } else if constexpr (std::is_same_v<T, GoTo>) {
+          jsonResponse["type"] = PacketType::GoTo;
+
+          // Required fields
+          jsonResponse["payload"]["x"] = resp.x;
+          jsonResponse["payload"]["y"] = resp.y;
+          jsonResponse["payload"]["gameStateId"] = id;
+
+          // Optional turret rotation
+          if (resp.turretRotation.has_value()) {
+              jsonResponse["payload"]["turretRotation"] = static_cast<int>(resp.turretRotation.value());
+          } else {
+              jsonResponse["payload"]["turretRotation"] = nullptr;
+          }
+
+          // Optional costs
+          if (resp.costs.has_value()) {
+              const auto& costs = resp.costs.value();
+              jsonResponse["payload"]["costs"]["forward"] = costs.forward;
+              jsonResponse["payload"]["costs"]["backward"] = costs.backward;
+              jsonResponse["payload"]["costs"]["rotate"] = costs.rotate;
+          }
+
+          // Optional penalties
+          if (resp.penalties.has_value()) {
+              const auto& penalties = resp.penalties.value();
+              jsonResponse["payload"]["penalties"]["blindly"] = penalties.blindly;
+              jsonResponse["payload"]["penalties"]["bullet"] = penalties.bullet;
+              jsonResponse["payload"]["penalties"]["mine"] = penalties.mine;
+              jsonResponse["payload"]["penalties"]["laser"] = penalties.laser;
+
+              // Add per-tile penalties if any
+              if (!penalties.perTile.empty()) {
+                  nlohmann::json perTileArray = nlohmann::json::array();
+                  for (const auto& tile : penalties.perTile) {
+                      nlohmann::json tileJson;
+                      tileJson["x"] = tile.x;
+                      tileJson["y"] = tile.y;
+                      tileJson["penalty"] = tile.penalty;
+                      perTileArray.push_back(tileJson);
+                  }
+                  jsonResponse["payload"]["penalties"]["perTile"] = perTileArray;
+              }
+          }
+      }
 	}, response);
 
 	return jsonResponse.dump(); // Convert JSON object to string
@@ -51,26 +95,35 @@ void Handler::HandleGameState(nlohmann::json payload) {
 	std::string id = payload["id"].get<std::string>();
 	gameState.time = payload["tick"].get<int>();
 
-	// Parse the players
-	for (const auto& playerJson : payload["players"]) {
-		Player player;
-		player.id = playerJson["id"].get<std::string>();
-		player.nickname = playerJson["nickname"].get<std::string>();
-		player.color = playerJson["color"].get<uint32_t>();
-		player.ping = playerJson["ping"].get<int>();
+	// Parse the teams and players
+	for (const auto& teamJson : payload["teams"]) {
+		Team team;
+		team.name = teamJson["name"].get<std::string>();
+		team.color = teamJson["color"].get<uint32_t>();
 
-		// Optional fields
-		if (playerJson.contains("score") && !playerJson["score"].is_null()) {
-			player.score = playerJson["score"].get<int>();
+		// Optional team score
+		if (teamJson.contains("score") && !teamJson["score"].is_null()) {
+			team.score = teamJson["score"].get<int>();
 		}
-		if (playerJson.contains("ticksToRegen") && !playerJson["ticksToRegen"].is_null()) {
-			player.ticksToRegen = playerJson["ticksToRegen"].get<int>();
-		}
-        if (playerJson.contains("isUsingRadar") && !playerJson["isUsingRadar"].is_null()) {
-            player.isUsingRadar = playerJson["isUsingRadar"].get<bool>();
-        }
 
-		gameState.players.push_back(player);
+		// Parse players in each team
+		for (const auto& playerJson : teamJson["players"]) {
+			Player player;
+			player.id = playerJson["id"].get<std::string>();
+			player.ping = playerJson["ping"].get<int>();
+
+			// Optional fields
+			if (playerJson.contains("score") && !playerJson["score"].is_null()) {
+				player.score = playerJson["score"].get<int>();
+			}
+			if (playerJson.contains("ticksToRegen") && !playerJson["ticksToRegen"].is_null()) {
+				player.ticksToRegen = playerJson["ticksToRegen"].get<int>();
+			}
+
+			team.players.push_back(player);
+		}
+
+		gameState.teams.push_back(team);
 	}
 
 	// Parse the map
@@ -151,17 +204,23 @@ void Handler::HandleGameState(nlohmann::json payload) {
                     // Parse Tank
                     Tank tank;
 
-                    // Check if ownerId exists and is not null
-                    if (!tileJson["payload"].contains("ownerId") || tileJson["payload"]["ownerId"].is_null()) {
-                        throw std::runtime_error("Missing or null ownerId in tank payload.");
-                    }
-                    tank.ownerId = tileJson["payload"]["ownerId"].get<std::string>();
+					// Check if ownerId exists and is not null
+					if (!tileJson["payload"].contains("ownerId") || tileJson["payload"]["ownerId"].is_null()) {
+						throw std::runtime_error("Missing or null ownerId in tank payload.");
+					}
+					tank.ownerId = tileJson["payload"]["ownerId"].get<std::string>();
 
-                    // Check if direction exists and is not null
-                    if (!tileJson["payload"].contains("direction") || tileJson["payload"]["direction"].is_null()) {
-                        throw std::runtime_error("Missing or null direction in tank payload.");
-                    }
-                    tank.direction = Direction{tileJson["payload"]["direction"].get<int>()};
+					// Check if tankType exists and is not null
+					if (!tileJson["payload"].contains("type") || tileJson["payload"]["type"].is_null()) {
+						throw std::runtime_error("Missing or null tankType in tank payload.");
+					}
+					tank.tankType = static_cast<TankType>(tileJson["payload"]["type"].get<int>());
+
+					// Check if direction exists and is not null
+					if (!tileJson["payload"].contains("direction") || tileJson["payload"]["direction"].is_null()) {
+						throw std::runtime_error("Missing or null direction in tank payload.");
+					}
+					tank.direction = static_cast<Direction>(tileJson["payload"]["direction"].get<int>());
 
                     // Parse Turret (assuming it is mandatory in Tank)
                     if (!tileJson["payload"].contains("turret") || tileJson["payload"]["turret"].is_null()) {
@@ -176,27 +235,51 @@ void Handler::HandleGameState(nlohmann::json payload) {
                     }
                     tank.turret.direction = turretJson["direction"].get<Direction>();
 
-                    // Check if bulletCount exists and is not null
-                    if (turretJson.contains("bulletCount")) {
-                        tank.turret.bulletCount = turretJson["bulletCount"].get<int>();
-                    }
+					// Optional bulletCount field for turret
+					if (turretJson.contains("bulletCount") && !turretJson["bulletCount"].is_null()) {
+						tank.turret.bulletCount = turretJson["bulletCount"].get<int>();
+					}
 
-                    // Optional health field
-                    if (tileJson["payload"].contains("health") && !tileJson["payload"]["health"].is_null()) {
-                        tank.health = tileJson["payload"]["health"].get<int>();
-                    }
+					// Optional ticksToBullet field for turret (previously ticksToRegenBullet)
+					if (turretJson.contains("ticksToBullet") && !turretJson["ticksToBullet"].is_null()) {
+						tank.turret.ticksToBullet = turretJson["ticksToBullet"].get<int>();
+					}
 
-                    // Optional secondaryItem field
-                    if (tileJson["payload"].contains("secondaryItem") && !tileJson["payload"]["secondaryItem"].is_null()) {
-                        tank.secondaryItem = tileJson["payload"]["secondaryItem"].get<SecondaryItemType>();
-                    }
+					// Optional ticksToDoubleBullet field for light tanks
+					if (turretJson.contains("ticksToDoubleBullet") && !turretJson["ticksToDoubleBullet"].is_null()) {
+						tank.turret.ticksToDoubleBullet = turretJson["ticksToDoubleBullet"].get<int>();
+					}
 
-                    // Optional field for ticksToRegenBullet in Turret
-                    if (turretJson.contains("ticksToRegenBullet") && !turretJson["ticksToRegenBullet"].is_null()) {
-                        tank.turret.ticksToRegenBullet = turretJson["ticksToRegenBullet"].get<int>();
-                    }
-                    nextObject = tank;
-                }
+					// Optional ticksToLaser field for heavy tanks
+					if (turretJson.contains("ticksToLaser") && !turretJson["ticksToLaser"].is_null()) {
+						tank.turret.ticksToLaser = turretJson["ticksToLaser"].get<int>();
+					}
+
+					// Optional health field
+					if (tileJson["payload"].contains("health") && !tileJson["payload"]["health"].is_null()) {
+						tank.health = tileJson["payload"]["health"].get<int>();
+					}
+
+					// Tank type specific fields
+					if (tank.tankType == TankType::Heavy) {
+						// Optional ticksToMine field for heavy tanks
+						if (tileJson["payload"].contains("ticksToMine") && !tileJson["payload"]["ticksToMine"].is_null()) {
+							tank.ticksToMine = tileJson["payload"]["ticksToMine"].get<int>();
+						}
+					} else if (tank.tankType == TankType::Light) {
+						// Optional ticksToRadar field for light tanks
+						if (tileJson["payload"].contains("ticksToRadar") && !tileJson["payload"]["ticksToRadar"].is_null()) {
+							tank.ticksToRadar = tileJson["payload"]["ticksToRadar"].get<int>();
+						}
+
+						// Optional isUsingRadar field for light tanks
+						if (tileJson["payload"].contains("isUsingRadar") && !tileJson["payload"]["isUsingRadar"].is_null()) {
+							tank.isUsingRadar = tileJson["payload"]["isUsingRadar"].get<bool>();
+						}
+					}
+
+					nextObject = tank;
+				}
                 else if (type == "bullet") {
                     // Parse Bullet
                     Bullet bullet{};
@@ -205,12 +288,6 @@ void Handler::HandleGameState(nlohmann::json payload) {
                     bullet.direction = tileJson["payload"]["direction"].get<Direction>();
                     bullet.type = tileJson["payload"]["type"].get<BulletType>();
                     nextObject = bullet;
-                }
-                else if (type == "item") {
-                    // Parse Item
-                    Item item{};
-                    item.type = tileJson["payload"]["type"].get<ItemType>();
-                    nextObject = item;
                 }
                 else if (type == "laser") {
                     // Parse Item
@@ -265,18 +342,29 @@ void Handler::HandleGameState(nlohmann::json payload) {
 }
 
 void Handler::HandleGameEnded(nlohmann::json payload) {
-    EndGameLobby endGameLobby;
+	EndGameLobby endGameLobby;
 
-    // Extract players array and populate the players vector
-    for (const auto& player : payload.at("players")) {
-        EndGamePlayer lobbyPlayer;
-        lobbyPlayer.id = player.at("id").get<std::string>();
-        lobbyPlayer.nickname = player.at("nickname").get<std::string>();
-        lobbyPlayer.color = player.at("color").get<uint32_t>();
-        lobbyPlayer.score = player.at("score").get<int>();
+	// Extract teams array and populate the teams vector
+	for (const auto& team : payload.at("teams")) {
+		EndGameTeam endGameTeam;
+		endGameTeam.name = team.at("name").get<std::string>();
+		endGameTeam.color = team.at("color").get<uint32_t>();
+		endGameTeam.score = team.at("score").get<int>();
 
-        endGameLobby.players.push_back(lobbyPlayer);
-    }
+		// Extract players array for this team
+		for (const auto& player : team.at("players")) {
+			EndGamePlayer endGamePlayer;
+			endGamePlayer.id = player.at("id").get<std::string>();
+			endGamePlayer.kills = player.at("kills").get<int>();
+			endGamePlayer.tankType = player.at("tankType").get<TankType>();
+
+			// Add player to the team
+			endGameTeam.players.push_back(endGamePlayer);
+		}
+
+		// Add team to the lobby
+		endGameLobby.teams.push_back(endGameTeam);
+	}
 
     botPtr->OnGameEnded(endGameLobby);
 }
@@ -287,14 +375,26 @@ void Handler::HandleLobbyData(nlohmann::json payload) {
 	// Extract the playerId
 	lobbyData.myId = payload.at("playerId").get<std::string>();
 
-	// Extract players array and populate the players vector
-	for (const auto& player : payload.at("players")) {
-		LobbyPlayer lobbyPlayer;
-		lobbyPlayer.id = player.at("id").get<std::string>();
-		lobbyPlayer.nickname = player.at("nickname").get<std::string>();
-		lobbyPlayer.color = player.at("color").get<uint32_t>();
+	// Extract teams array and populate the teams vector
+	for (const auto& teamJson : payload.at("teams")) {
+		LobbyTeams lobbyTeam;
+		lobbyTeam.name = teamJson.at("name").get<std::string>();
+		lobbyTeam.color = teamJson.at("color").get<uint32_t>();
 
-		lobbyData.players.push_back(lobbyPlayer);
+		// Extract players in this team
+		for (const auto& playerJson : teamJson.at("players")) {
+			LobbyPlayer lobbyPlayer;
+			lobbyPlayer.id = playerJson.at("id").get<std::string>();
+
+			// Parse tank type
+			if (playerJson.contains("tankType") && !playerJson["tankType"].is_null()) {
+				lobbyPlayer.tankType = static_cast<TankType>(playerJson.at("tankType").get<int>());
+			}
+
+			lobbyTeam.players.push_back(lobbyPlayer);
+		}
+
+		lobbyData.teams.push_back(lobbyTeam);
 	}
 
 	// Extract server settings from the nested object

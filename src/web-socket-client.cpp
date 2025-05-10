@@ -8,8 +8,8 @@ boost::asio::ip::tcp::socket WebSocketClient::socket(WebSocketClient::ioc);
 boost::beast::websocket::stream<boost::asio::ip::tcp::socket> WebSocketClient::ws(std::move(WebSocketClient::socket));
 std::thread WebSocketClient::workThread;
 
-WebSocketClient::WebSocketClient(std::string  host, std::string  port, std::string nickname, std::string  code)
-	: host(std::move(host)), port(std::move(port)), nickname(std::move(nickname)), code(std::move(code)),
+WebSocketClient::WebSocketClient(std::string  host, std::string  port, std::string teamName, std::string tankType, std::string  code)
+	: host(std::move(host)), port(std::move(port)), teamName(std::move(teamName)), tankType(std::move(tankType)), code(std::move(code)),
 	  handler(&bot, &messagesToSend, &mtx, &cv) {}
 
 WebSocketClient::~WebSocketClient()
@@ -41,13 +41,14 @@ void WebSocketClient::Stop()
 
 std::string WebSocketClient::ConstructUrl()
 {
-	std::string url = "/?nickname=" + nickname;
+	std::string url = "/?teamName=" + teamName;
 
 	if (!code.empty()) {
 		url += "&joinCode=" + code;
 	}
 
-    url+= "&playerType=hackathonBot";
+    url += "&playerType=hackathonBot";
+	url += "&tankType=" + tankType;
 
 	return url;
 }
@@ -209,12 +210,13 @@ void WebSocketClient::ProcessMessage(const std::string &message) {
                 std::cout << "GameStarted!" << std::endl << std::flush;
                 break;
             case PacketType::GameState:
+        		printf(message.c_str());
                 handler.HandleGameState(packet.payload);
                 break;
             case PacketType::LobbyData:
                 handler.HandleLobbyData(packet.payload);
                 break;
-            case PacketType::GameEnded:
+            case PacketType::GameEnd:
                 handler.HandleGameEnded(packet.payload);
                 Stop();
                 break;
