@@ -174,8 +174,6 @@ void Handler::HandleGameState(nlohmann::json payload) {
 			}
 		}
 
-		zoneShares = ZoneShares(zoneJson["shares"]);
-
 		zone.status = zoneShares;
 		gameState.map.zones.push_back(zone);
 	}
@@ -302,6 +300,12 @@ void Handler::HandleGameState(nlohmann::json payload) {
                 		const auto& visibilityJson = tileJson["payload"]["visibility"];
                 		size_t numRows = visibilityJson.size();
                 		size_t numCols = visibilityJson[0].get<std::string>().size();
+
+                		// FIXED: Check if the optional has a value and initialize it if not
+                		if (!tank.visibility.has_value()) {
+                			tank.visibility = std::vector<std::vector<char>>();
+                		}
+
                 		tank.visibility.value().resize(numCols, std::vector<char>(numRows));
                 		for (size_t i = 0; i < numRows; ++i) {
                 			std::string row = visibilityJson[i].get<std::string>();

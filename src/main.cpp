@@ -27,14 +27,14 @@ int main(int argc, char** argv) {
 	// Update default values based on provided arguments
 	if (args.count("host")) host = args["host"];
 	if (args.count("port")) port = args["port"];
-	if (args.count("teamName")) teamName = args["teamName"];
-	if (args.count("tankType")) tankType = args["tankType"];
+	if (args.count("team-name")) teamName = args["team-name"];
+	if (args.count("tank-type")) tankType = args["tank-type"];
 	if (args.count("code")) code = args["code"];
 
 	bool isValidTankType = (tankType == "light" || tankType == "heavy");
 
 	if (args.count("help") || teamName.empty() || tankType.empty() || !isValidTankType) {
-        std::cout << "--teamName Team Name that will be displayed in the game.\n--tankType Tank type that will be used in the game. light or heavy\n--host The IP address or domain name of the server to connect to.\nThe bot will attempt to establish a connection to the specified host.\nIf not provided, it defaults to 'localhost'.\n--port The port on which the server is listening.\nThis specifies the port number that the server is using for communication.\nIf not provided, it defaults to port 5000.\n--code Optional access code required to join the server.\nIf the server enforces an access code for connections, it must be supplied here.\nIf no code is required, this can be left empty (default is an empty string)."
+        std::cout << "--team-name Team Name that will be displayed in the game.\n--tank-type Tank type that will be used in the game. light or heavy\n--host The IP address or domain name of the server to connect to.\nThe bot will attempt to establish a connection to the specified host.\nIf not provided, it defaults to 'localhost'.\n--port The port on which the server is listening.\nThis specifies the port number that the server is using for communication.\nIf not provided, it defaults to port 5000.\n--code Optional access code required to join the server.\nIf the server enforces an access code for connections, it must be supplied here.\nIf no code is required, this can be left empty (default is an empty string)."
                 << std::endl << std::flush;
         return EXIT_SUCCESS;
     };
