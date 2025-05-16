@@ -1,14 +1,14 @@
 # MonoTanks API wrapper in C++ for HackArena 2.5
 
-This API wrapper for MonoTanks game for the HackArena 2.5, organized by KN init.
-It is implemented as a WebSocket wrapper written in C++ programming language and
-can be used to create bots for the game.
+This API wrapper for StereoTanks game for the HackArena 2.5, organized by
+KN init. It is implemented as a WebSocket client written in C++ programming
+language and can be used to create bots for the game.
 
 To fully test and run the game, you will also need the game server and GUI
-wrapper, as the GUI provides a visual representation of gameplay. You can find
-more information about the server and GUI wrapper in the following repository:
+client, as the GUI provides a visual representation of gameplay. You can find
+more information about the server and GUI client in the following repository:
 
-- [Server and GUI client Repository](https://github.com/INIT-SGGW/HackArena2.0-MonoTanks)
+- [Server and GUI Client Repository](https://github.com/INIT-SGGW/HackArena2.5-StereoTanks)
 
 The guide to the game mechanics and tournament rules can be found on the:
 - [Instruction Page](https://hackarena.pl/Assets/Game/HackArena%202.0%20-%20instrukcja.pdf)
@@ -17,10 +17,10 @@ The guide to the game mechanics and tournament rules can be found on the:
 
 Clone this repo using git:
 ```sh
-git clone https://github.com/INIT-SGGW/HackArena2.5-StereoTanks-Cxx.git
+git clone https://github.com/INIT-SGGW/HackArena2.5-StereoTanks.git
 ```
 
-or download the [zip file](https://github.com/INIT-SGGW/HackArena2.5-StereoTanks-Cxx/archive/refs/heads/master.zip)
+or download the [zip file](https://github.com/INIT-SGGW/HackArena2.5-StereoTanks/archive/refs/heads/main.zip)
 and extract it.
 
 The bot logic you are going to implement is located in `src/bot/bot.cpp` and declarations in `src/bot/bot.h`
@@ -34,15 +34,30 @@ final game state.
 `NextMove` returns a `ResponseVariant` (`std::variant`), which can be one of the following:
 
 - `Rotate`: This variant indicates a rotation action, allowing the player to rotate their tank and/or turret.
-    - `tankRotation` (`RotationDirection`): Specifies the rotation direction of the tank (left or right).
-    - `turretRotation` (`RotationDirection`): Specifies the rotation direction of the turret (left or right).
+    - `tankRotation` (`RotationDirection`): Specifies the rotation direction of the tank (left, right, or none).
+    - `turretRotation` (`RotationDirection`): Specifies the rotation direction of the turret (left, right, or none).
 
 - `Move`: This variant indicates a movement action, allowing the player to move the tank.
     - `direction` (`MoveDirection`): Specifies the direction of movement (forward or backward).
 
-- `AbilityUse`: This variant represents an ability use action, where the tank can: shoot a bullet in the direction the turret is pointing, fire double bullet, use laser, use radar, drop mine behind the tank.
+- `AbilityUse`: This variant represents an ability use action, where the tank can use one of the following abilities:
+    - `fireBullet`: Shoots a regular bullet in the direction the turret is pointing
+    - `useLaser`: Uses a laser ability (heavy tanks only)
+    - `fireDoubleBullet`: Fires two bullets simultaneously (light tanks only)
+    - `useRadar`: Activates the radar for enhanced visibility (light tanks only)
+    - `dropMine`: Drops a mine behind the tank (heavy tanks only)
+    - `fireHealingBullet`: Fires a bullet that can heal friendly tanks
+    - `fireStunBullet`: Fires a bullet that can temporarily stun enemy tanks
 
 - `Wait`: This variant indicates that the player chooses to wait, doing nothing during the current tick.
+
+- `CaptureZone`: This variant indicates that the player is attempting to capture a zone they are currently in.
+
+- `GoTo`: This variant provides pathfinding capabilities for the tank:
+    - `x`, `y`: Target coordinates to move to
+    - `turretRotation` (optional): Direction to rotate the turret while moving
+    - `costs` (optional): Custom movement costs for pathfinding
+    - `penalties` (optional): Custom penalties for different obstacles
 
 `ResponseVariant` allows the game to handle different player actions in a flexible manner, responding to their decisions at each game tick.
 
@@ -61,111 +76,104 @@ The game map is represented by several structs that define its layout, tiles, zo
 #### **Map**
 The `Map` struct represents the game world and is made up of tiles and zones:
 - **tiles**: A 2D vector of `Tile`, where each tile has:
-    - `isVisible`: Whether the tile is visible to the player.
     - `zoneName`: The name of the zone for this tile (or '?' if no zone).
-    - `objects` : Objects in tile which can be 0 or more:
-        - `Wall`: Represents an indestructible barrier.
+    - `objects` : Vector of objects in tile which can be 0 or more of:
+        - `Wall`: Represents a barrier with different types:
+            - `solid`: Cannot be passed through or shot through
+            - `penetrable`: Cannot be passed through but can be shot through
         - `Tank`: Represents a tank on the map.
             - `ownerId`: The player owning the tank.
+            - `tankType`: The type of tank (Light or Heavy)
             - `direction`: The direction the tank is facing.
             - `turret`: A `Turret` struct containing the direction of the turret and, if available, bullet information.
             - `health` (optional): Health points of the tank (absent for enemies).
+            - `visibility` (optional): 2D vector of chars indicating visible tiles ('0' for invisible, '1' for visible)
+            - Tank type specific fields:
+                - Light tanks: `ticksToRadar`, `isUsingRadar`, `ticksToDoubleBullet`
+                - Heavy tanks: `ticksToMine`, `ticksToLaser`
         - `Bullet`: Represents a bullet on the map.
             - `id`: A unique identifier for the bullet.
+            - `type`: Type of bullet (basic, doubleBullet, healing, stun)
             - `speed`: The speed at which the bullet moves.
             - `direction`: The direction the bullet is traveling (up, down, left, right).
-        - `Item` : Represents an item on the map. They give abilities.
-          - `ItemType` : Type of item.
+        - `Laser`: Represents a laser fired by a tank.
+            - `id`: A unique identifier for the laser.
+            - `orientation`: The orientation of the laser (horizontal or vertical).
+        - `Mine`: Represents a mine placed by a tank.
+            - `id`: A unique identifier for the mine.
+            - `explosionRemainingTicks` (optional): The number of ticks remaining until the explosion finishes.
 
 - **zones**: A vector of `Zone` structs that represent specific regions on the map.
     - **Zone**
         - `x`, `y`: The coordinates of the zone's position on the map.
         - `width`, `height`: The dimensions of the zone.
         - `name`: The character representing the zone (e.g., A, B, C).
-        - `status`: A `ZoneStatus` struct representing the current state of the zone.
+        - `status`: A `ZoneShares` struct representing the ownership of the zone.
 
-- **visibility**: A 2D vector of chars representing visibility for each tile ('0' for invisible, '1' for visible).
-
-#### **ZoneStatus**
-This struct tracks the current state of a zone, such as whether it's being captured or contested:
-- **type**: A string representing the type of status (e.g., "beingCaptured", "captured", "beingContested", "beingRetaken", "neutral").
-- **remainingTicks** (optional): If the zone is being captured or retaken, this field shows how many ticks are left.
-- **playerId** (optional): The ID of the player capturing or that captured the zone.
-- **capturedById** (optional): Used when zone is "beingContested" or "beingRetaken" instead of **playerId**.
-- **retakenById** (optional): The ID of the player retaking the zone, if applicable.
+#### **ZoneShares**
+This struct tracks the current ownership state of a zone:
+- **neutral**: The percentage (0.0 to 1.0) of the zone that is neutral.
+- **teamShares**: A map of team names to their ownership percentage of the zone.
 
 ---
 
-### Player, Lobby, and End Game Structs
+### Team, Player, Lobby, and End Game Structs
+
+#### **Team**
+Represents a team in the game:
+- **name**: The team's name.
+- **color**: The team's color (as uint32_t).
+- **score** (optional): The team's current score.
+- **players**: A vector of `Player` structs.
+
+#### **Player**
+Represents a player in the game:
+- **id**: The player's unique ID.
+- **ping**: The player's ping (latency).
+- **score** (optional): The player's current score.
+- **ticksToRegen** (optional): The number of ticks until the player's tank regenerates.
 
 #### **LobbyPlayer**
-Represents a player in the game lobby before the game starts:
-- **id**: A unique identifier for the player.
-- **nickname**: The player's chosen name.
-- **color**: The player's assigned color, represented as a `uint32_t`.
+Represents a player in the pre-game lobby:
+- **id**: The player's unique ID.
+- **tankType**: The type of tank chosen by the player (Light or Heavy).
+
+#### **LobbyTeams**
+Represents a team in the pre-game lobby:
+- **name**: The team's name.
+- **color**: The team's color.
+- **players**: A vector of `LobbyPlayer` structs.
 
 #### **LobbyData**
-This struct holds data related to the game lobby:
-- **myId**: The ID of the current player.
-- **players**: A vector of `LobbyPlayer` structs, representing all players in the lobby.
-- **gridDimension**: The dimensions of the game grid.
+Contains information about the game lobby:
+- **myId**: The current player's ID.
+- **teamName**: The current player's team name.
+- **teams**: A vector of `LobbyTeams` structs.
+- **sandboxMode**: Whether the game is in sandbox mode.
+- **matchName** (optional): The name of the match.
+- **gridDimension**: The size of the game grid.
 - **numberOfPlayers**: The number of players in the game.
-- **seed**: A seed value used for randomization.
-- **broadcastInterval**: The interval (in milliseconds) between server broadcasts.
-- **eagerBroadcast**: A boolean indicating if the game is using eager broadcasting (for faster updates).
+- **seed**: The random seed for the game.
+- **broadcastInterval**: The interval between server broadcasts (in milliseconds).
+- **eagerBroadcast**: Whether the server uses eager broadcasting.
+- **version**: The server version.
 
 #### **EndGamePlayer**
-Similar to `LobbyPlayer`, but also includes the player's score:
+Represents a player at the end of the game:
 - **id**: The player's ID.
-- **nickname**: The player's name.
-- **color**: The player's color.
-- **score**: The player's final score at the end of the game.
+- **kills**: The number of kills the player achieved.
+- **tankType**: The type of tank the player used.
+
+#### **EndGameTeam**
+Represents a team at the end of the game:
+- **name**: The team's name.
+- **color**: The team's color.
+- **score**: The team's final score.
+- **players**: A vector of `EndGamePlayer` structs.
 
 #### **EndGameLobby**
-Holds information about all players at the end of the game:
-- **players**: A vector of `EndGamePlayer` structs, containing the end-game data for each player.
-
-#### **Tank**
-Represents a tank in the game, including its owner and status:
-- **ownerId**: The ID of the player controlling the tank.
-- **direction**: The direction the tank is facing (e.g., up, down, left, right).
-- **turret**: A `Turret` struct representing the tank's turret.
-- **health** (optional): The health points of the tank (absent for enemy tanks).
-
-#### **Turret**
-Represents the turret on a tank:
-- **direction**: The direction the turret is facing.
-- **bulletCount** (optional): The number of bullets left (absent for enemy turrets).
-- **ticksToRegenBullet** (optional): The ticks remaining before a new bullet is regenerated (absent for enemies).
-
-#### **Bullet**
-Represents a bullet fired by a tank:
-- **id**: A unique ID for the bullet.
-- **type**: Bullet or DoubleBullet
-- **speed**: The speed of the bullet.
-- **direction**: The direction the bullet is traveling.
-
-#### **Laser**
-Represents a laser shot by a tank:
-- **id**: A unique ID for the laser.
-- **orientation**: The orientation of the laser (horizontal or vertical).
-
-#### **Mine**
-Represents a mine placed by a tank:
-- **id**: A unique ID for the mine.
-- **explosionRemainingTicks** (optional): The number of ticks remaining until the explosion finishes.
-
-#### **Wall**
-Represents an indestructible barrier on the game map
-
-#### **Item**
-Represents an item on the map that grants abilities to the tank:
-- **type**: The type of item available.
-    - `unknown`: Only when the tank is on the item.
-    - `laser`: Grants the ability to shoot a laser.
-    - `doubleBullet`: Allows the player to shoot two bullets simultaneously.
-    - `radar`: Provides enhanced visibility of the surrounding area.
-    - `mine`: Allows the player to drop a mine behind the tank.
+Contains all teams at the end of the game:
+- **teams**: A vector of `EndGameTeam` structs.
 
 ---
 
@@ -173,15 +181,31 @@ Represents an item on the map that grants abilities to the tank:
 
 The `GameState` struct captures the state of the game at a specific point in time:
 - **time**: The current tick number (a measure of game progress).
-- **players**: A vector of `Player` structs, representing all players currently in the game.
-    - **Player**
-        - **id**: The player's unique ID.
-        - **nickname**: The player's name.
-        - **color**: The player's assigned color.
-        - **ping**: The player's ping (latency).
-        - **score** (optional): The player's score (absent for enemies).
-        - **ticksToRegen** (optional): The number of ticks until the player's next action can occur (e.g., reloading).
-- **map**: The `Map` struct, representing the current state of the game world, including tiles, zones, and visibility.
+- **teams**: A vector of `Team` structs, representing all teams in the game.
+- **playerId** (optional): The ID of the current player.
+- **map**: The `Map` struct representing the current state of the game world.
+
+## Enhanced Bot Features
+
+The updated bot implementation in `bot.cpp` includes several advanced features:
+
+### Improved Map Visualization
+- Different symbols for all object types (tanks, bullets, walls, etc.)
+- Enhanced display with borders and a detailed legend
+- Visual distinction between different wall types, bullet types, and tank types
+- Special indicators for mines that are about to explode
+
+### Intelligent Random Actions
+- Weighted probabilities for different action types
+- Tank-type specific ability selection (Light vs. Heavy)
+- Support for all ability types including healing and stun bullets
+- Zone capture attempts during wait actions
+
+### Detailed Information Logging
+- Turn-by-turn state reporting
+- Action selection explanation
+- Game initialization and ending summaries
+- Warning message handling
 
 ## Running the Bot
 
@@ -227,7 +251,7 @@ Steps:
    ```
 2. Run the Docker container:
    ```sh
-   docker run --rm wrapper --nickname Cxx --host host.docker.internal
+   docker run --rm wrapper --teamName YourTeam --tankType light --host host.docker.internal
    ```
 
 If the server is running on your local machine, use the
@@ -241,7 +265,7 @@ host.
 Anything! **Just make sure it works :)**
 
 You can modify mentioned files and create more files in the `src/bot`
-directory or `src/data` directory which will be copied to the same dir as compiled program on docker. 
+directory or `src/data` directory which will be copied to the same dir as compiled program on docker.
 Modifying of any other files is not recommended, as this may prevent us from running
 your bot during the competition.
 
