@@ -210,7 +210,6 @@ void WebSocketClient::ProcessMessage(const std::string &message) {
                 std::cout << "GameStarted!" << std::endl << std::flush;
                 break;
             case PacketType::GameState:
-        		printf(message.c_str());
                 handler.HandleGameState(packet.payload);
                 break;
             case PacketType::LobbyData:
