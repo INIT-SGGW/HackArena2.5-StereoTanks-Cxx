@@ -102,6 +102,11 @@ struct Tank {
 	std::optional<std::vector<std::vector<char>>> visibility;
 };
 
+enum class WallType {
+	solid = 0,
+	penetrable = 1
+};
+
 enum class BulletType {
     basic = 0,
     doubleBullet = 1,
@@ -132,17 +137,10 @@ struct Mine {
     std::optional<int> explosionRemainingTicks;
 };
 
-/// ZoneStatus struct to represent various zone states
-struct ZoneStatus {
-	std::string type;
-    /// Used in "beingCaptured" and "beingRetaken"
-	std::optional<int> remainingTicks;
-    /// Used in "beingCaptured" and "captured"
-	std::optional<std::string> playerId;
-    /// Used in "beingContested" and "beingRetaken"
-	std::optional<std::string> capturedById;
-    /// Used in "beingRetaken"
-	std::optional<std::string> retakenById;
+/// ZoneShares struct to represent various zone shares
+struct ZoneShares {
+	float neutral;
+	std::map<std::string, float> teamShares;
 };
 
 /// Zone struct to represent a zone on the map
@@ -152,7 +150,7 @@ struct Zone {
 	int width;
 	int height;
 	char name;
-	ZoneStatus status;
+	ZoneShares status;
 };
 
 // Player struct
@@ -172,13 +170,14 @@ struct Team {
 	std::vector<Player> players;
 };
 
-struct Wall {};
+struct Wall {
+	WallType type;
+};
 
 using TileVariant = std::variant<Wall, Tank, Bullet, Mine, Laser>;
 
 struct Tile {
     std::vector<TileVariant> objects;
-    bool isVisible;
     char zoneName; // '?' or 63 for no zone
 };
 
@@ -238,6 +237,8 @@ struct AbilityUse {
 
 struct Wait {};
 
+struct CaptureZone {};
+
 // For per-tile penalties
 struct PerTilePenalty {
 	int x;
@@ -270,7 +271,7 @@ struct GoTo {
 	std::optional<GotoPenalties> penalties;
 };
 
-using ResponseVariant = std::variant<Rotate, Move, AbilityUse, Wait, GoTo>;
+using ResponseVariant = std::variant<Rotate, Move, AbilityUse, Wait, GoTo, CaptureZone>;
 
 enum class WarningType {
     CustomWarning,

@@ -27,6 +27,9 @@ std::string Handler::ResponseToString(const ResponseVariant& response, std::stri
 	  } else if constexpr (std::is_same_v<T, Wait>) {
 		  jsonResponse["type"] = PacketType::ResponsePass;
           jsonResponse["payload"]["gameStateId"] = id;
+	  } else if constexpr (std::is_same_v<T, CaptureZone>) {
+		  jsonResponse["type"] = PacketType::CaptureZone;
+		  jsonResponse["payload"]["gameStateId"] = id;
 	  } else if constexpr (std::is_same_v<T, GoTo>) {
           jsonResponse["type"] = PacketType::GoTo;
 
@@ -142,25 +145,25 @@ void Handler::HandleGameState(nlohmann::json payload) {
 		zone.height = zoneJson["height"].get<int>();
 		zone.name = zoneJson["index"].get<char>();
 
-		// Parse ZoneStatus (with optional fields)
-		ZoneStatus zoneStatus;
-		zoneStatus.type = zoneJson["status"]["type"].get<std::string>();
+		ZoneShares zoneShares;
 
-		// Optional fields for ZoneStatus based on its type
-		if (zoneJson["status"].contains("remainingTicks") && !zoneJson["status"]["remainingTicks"].is_null()) {
-			zoneStatus.remainingTicks = zoneJson["status"]["remainingTicks"].get<int>();
-		}
-		if (zoneJson["status"].contains("playerId") && !zoneJson["status"]["playerId"].is_null()) {
-			zoneStatus.playerId = zoneJson["status"]["playerId"].get<std::string>();
-		}
-		if (zoneJson["status"].contains("capturedById") && !zoneJson["status"]["capturedById"].is_null()) {
-			zoneStatus.capturedById = zoneJson["status"]["capturedById"].get<std::string>();
-		}
-		if (zoneJson["status"].contains("retakenById") && !zoneJson["status"]["retakenById"].is_null()) {
-			zoneStatus.retakenById = zoneJson["status"]["retakenById"].get<std::string>();
+		if (zoneJson.contains("shares")) {
+			auto sharesJson = zoneJson["shares"];
+
+			if (sharesJson.contains("neutral")) {
+				zoneShares.neutral = sharesJson["neutral"];
+			}
+
+			for (auto& [teamName, share] : sharesJson.items()) {
+				if (teamName != "neutral") {
+					zoneShares.teamShares[teamName] = share;
+				}
+			}
 		}
 
-		zone.status = zoneStatus;
+		zoneShares = ZoneShares(zoneJson["shares"]);
+
+		zone.status = zoneShares;
 		gameState.map.zones.push_back(zone);
 	}
 
@@ -189,7 +192,11 @@ void Handler::HandleGameState(nlohmann::json payload) {
                 std::string type = tileJson["type"].get<std::string>();
 
                 if (type == "wall") {
-                    nextObject = Wall();  // Wall has no additional properties
+                	Wall wall;
+
+                	wall.type = tileJson["payload"]["type"].get<WallType>();
+
+                    nextObject = wall;
                 }
                 else if (type == "tank") {
                     // Parse Tank
@@ -282,11 +289,11 @@ void Handler::HandleGameState(nlohmann::json payload) {
                 		const auto& visibilityJson = tileJson["payload"]["visibility"];
                 		size_t numRows = visibilityJson.size();
                 		size_t numCols = visibilityJson[0].get<std::string>().size();
-                		tank.visibility.value.resize(numCols, std::vector<char>(numRows));
+                		tank.visibility.value().resize(numCols, std::vector<char>(numRows));
                 		for (size_t i = 0; i < numRows; ++i) {
                 			std::string row = visibilityJson[i].get<std::string>();
                 			for (size_t j = 0; j < numCols; ++j) {
-                				tank.visibility.value[i][j] = row[j];
+                				tank.visibility.value()[i][j] = row[j];
                 			}
                 		}
                 	}
@@ -326,7 +333,6 @@ void Handler::HandleGameState(nlohmann::json payload) {
         }
     }
 
-    const auto& visibility = gameState.map.visibility;
     for (size_t row = 0; row < gameState.map.tiles.size(); ++row) {
         for (size_t col = 0; col < gameState.map.tiles[row].size(); ++col) {
 
@@ -341,8 +347,6 @@ void Handler::HandleGameState(nlohmann::json payload) {
                     break;  // Stop once a zone is found
                 }
             }
-
-			gameState.map.tiles[row][col].isVisible = (visibility[row][col] == '1');
         }
     }
 

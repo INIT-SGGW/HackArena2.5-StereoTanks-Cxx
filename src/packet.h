@@ -35,6 +35,7 @@ enum class PacketType {
     AbilityUse = PlayerResponseActionGroup | HasPayload | 0x3,
     ResponsePass = PlayerResponseActionGroup | HasPayload | 0x7,
     GoTo = PlayerResponseActionGroup | HasPayload | 0xE,
+	CaptureZone = PlayerResponseActionGroup | HasPayload | 0x44,
 
     // Debug group (range: 0xD0 - 0xDF)
     DebugGroup = 0xD0,

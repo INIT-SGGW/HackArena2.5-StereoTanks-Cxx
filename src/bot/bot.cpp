@@ -60,8 +60,6 @@ void Bot::PrintMap(const std::vector<std::vector<Tile>>& tiles) {
             if (!hasObject) {
                 if (tile.zoneName != '?') {
                     map[i][j] = tile.zoneName; // Print zone name
-                } else if (tile.isVisible) {
-                    map[i][j] = '.'; // Print visibility for visible None tile
                 } else {
                     map[i][j] = ' '; // Not visible, so leave it as empty space
                 }
