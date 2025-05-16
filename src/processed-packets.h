@@ -246,29 +246,30 @@ struct PerTilePenalty {
 	float penalty;
 };
 
-// Penalties structure
+// Penalties structure - can be null entirely, in which case pathfinding won't apply any penalties
 struct GotoPenalties {
-	float blindly = 5.0f;       // Default value
-	float bullet = 20.0f;       // Default value
-	float mine = 20.0f;         // Default value
-	float laser = 20.0f;        // Default value
-	std::vector<PerTilePenalty> perTile;
+	std::optional<float> blindly;   // Can be null, in which case pathfinding won't penalize going blindly
+	std::optional<float> tank;      // Can be null, in which case pathfinding won't penalize going through tanks
+	std::optional<float> bullet;    // Can be null, in which case pathfinding won't penalize going through bullets
+	std::optional<float> mine;      // Can be null, in which case pathfinding won't penalize going through mines
+	std::optional<float> laser;     // Can be null, in which case pathfinding won't penalize going through lasers
+	std::vector<PerTilePenalty> perTile; // Specific per-tile penalties
 };
 
-// Costs structure
+// Costs structure with default values
 struct GotoCosts {
-	float forward = 1.0f;       // Default value
-	float backward = 1.5f;      // Default value
-	float rotate = 1.5f;        // Default value
+	float forward = 1.0f;       // Default value: 1.0
+	float backward = 1.5f;      // Default value: 1.5
+	float rotate = 1.5f;        // Default value: 1.5
 };
 
 // Complete GoTo structure
 struct GoTo {
-	int x;
-	int y;
-	std::optional<RotationDirection> turretRotation;
-	std::optional<GotoCosts> costs;
-	std::optional<GotoPenalties> penalties;
+	int x;                                      // Target x coordinate
+	int y;                                      // Target y coordinate
+	std::optional<RotationDirection> turretRotation; // Optional turret rotation (left/0, right/1)
+	std::optional<GotoCosts> costs;             // Optional movement costs
+	std::optional<GotoPenalties> penalties;     // Optional penalties, can be null to disable all penalties
 };
 
 using ResponseVariant = std::variant<Rotate, Move, AbilityUse, Wait, GoTo, CaptureZone>;

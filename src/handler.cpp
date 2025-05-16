@@ -56,10 +56,23 @@ std::string Handler::ResponseToString(const ResponseVariant& response, std::stri
           // Optional penalties
           if (resp.penalties.has_value()) {
               const auto& penalties = resp.penalties.value();
-              jsonResponse["payload"]["penalties"]["blindly"] = penalties.blindly;
-              jsonResponse["payload"]["penalties"]["bullet"] = penalties.bullet;
-              jsonResponse["payload"]["penalties"]["mine"] = penalties.mine;
-              jsonResponse["payload"]["penalties"]["laser"] = penalties.laser;
+
+              // Add each penalty field only if it has a value
+              if (penalties.blindly.has_value()) {
+                  jsonResponse["payload"]["penalties"]["blindly"] = penalties.blindly.value();
+              }
+              if (penalties.tank.has_value()) {
+                  jsonResponse["payload"]["penalties"]["tank"] = penalties.tank.value();
+              }
+              if (penalties.bullet.has_value()) {
+                  jsonResponse["payload"]["penalties"]["bullet"] = penalties.bullet.value();
+              }
+              if (penalties.mine.has_value()) {
+                  jsonResponse["payload"]["penalties"]["mine"] = penalties.mine.value();
+              }
+              if (penalties.laser.has_value()) {
+                  jsonResponse["payload"]["penalties"]["laser"] = penalties.laser.value();
+              }
 
               // Add per-tile penalties if any
               if (!penalties.perTile.empty()) {
