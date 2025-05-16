@@ -41,7 +41,7 @@ void Bot::PrintMap(const std::vector<std::vector<Tile>>& tiles) {
                     }
                 } else if (std::holds_alternative<Bullet>(object)) {
                     if (auto bulletPtr = std::get_if<Bullet>(&object)) {
-                        if (bulletPtr->type == BulletType::bullet) {
+                        if (bulletPtr->type == BulletType::basic) {
                             map[i][j] = (bulletPtr->direction == Direction::up) ? "^" :
                                         (bulletPtr->direction == Direction::down) ? "v" :
                                         (bulletPtr->direction == Direction::left) ? "<" : ">";

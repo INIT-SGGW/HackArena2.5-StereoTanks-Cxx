@@ -95,6 +95,10 @@ void Handler::HandleGameState(nlohmann::json payload) {
 	std::string id = payload["id"].get<std::string>();
 	gameState.time = payload["tick"].get<int>();
 
+	if (payload.contains("playerId") && !payload["playerId"].is_null()) {
+		gameState.playerId = payload["playerId"].get<std::string>();
+	}
+
 	// Parse the teams and players
 	for (const auto& teamJson : payload["teams"]) {
 		Team team;
@@ -158,19 +162,6 @@ void Handler::HandleGameState(nlohmann::json payload) {
 
 		zone.status = zoneStatus;
 		gameState.map.zones.push_back(zone);
-	}
-
-	// Parse visibility (2D array of chars)
-	const auto& visibilityJson = mapJson["visibility"];
-	size_t numRows = visibilityJson.size();
-	size_t numCols = visibilityJson[0].get<std::string>().size();
-
-	gameState.map.visibility.resize(numCols, std::vector<char>(numRows));
-    	for (size_t i = 0; i < numRows; ++i) {
-		std::string row = visibilityJson[i].get<std::string>();
-		for (size_t j = 0; j < numCols; ++j) {
-			gameState.map.visibility[i][j] = row[j];
-		}
 	}
 
     const auto& layer = payload["map"]["tiles"];
@@ -255,6 +246,14 @@ void Handler::HandleGameState(nlohmann::json payload) {
 						tank.turret.ticksToLaser = turretJson["ticksToLaser"].get<int>();
 					}
 
+                	if (turretJson.contains("ticksToHealingBullet") && !turretJson["ticksToHealingBullet"].is_null()) {
+                		tank.turret.ticksToHealingBullet = turretJson["ticksToHealingBullet"].get<int>();
+                	}
+
+                	if (turretJson.contains("ticksToStunBullet") && !turretJson["ticksToStunBullet"].is_null()) {
+                		tank.turret.ticksToHealingBullet = turretJson["ticksToStunBullet"].get<int>();
+                	}
+
 					// Optional health field
 					if (tileJson["payload"].contains("health") && !tileJson["payload"]["health"].is_null()) {
 						tank.health = tileJson["payload"]["health"].get<int>();
@@ -277,6 +276,20 @@ void Handler::HandleGameState(nlohmann::json payload) {
 							tank.isUsingRadar = tileJson["payload"]["isUsingRadar"].get<bool>();
 						}
 					}
+
+                	// Parse visibility (2D array of chars)
+                	if (tileJson["payload"].contains("visibility") && !tileJson["payload"]["visibility"].is_null()) {
+                		const auto& visibilityJson = tileJson["payload"]["visibility"];
+                		size_t numRows = visibilityJson.size();
+                		size_t numCols = visibilityJson[0].get<std::string>().size();
+                		tank.visibility.value.resize(numCols, std::vector<char>(numRows));
+                		for (size_t i = 0; i < numRows; ++i) {
+                			std::string row = visibilityJson[i].get<std::string>();
+                			for (size_t j = 0; j < numCols; ++j) {
+                				tank.visibility.value[i][j] = row[j];
+                			}
+                		}
+                	}
 
 					nextObject = tank;
 				}
@@ -374,6 +387,7 @@ void Handler::HandleLobbyData(nlohmann::json payload) {
 
 	// Extract the playerId
 	lobbyData.myId = payload.at("playerId").get<std::string>();
+	lobbyData.teamName = payload.at("teamName").get<std::string>();
 
 	// Extract teams array and populate the teams vector
 	for (const auto& teamJson : payload.at("teams")) {

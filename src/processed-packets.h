@@ -40,6 +40,7 @@ struct EndGameLobby {
 
 struct LobbyData {
 	std::string myId;
+	std::string teamName;
 	std::vector<LobbyTeams> teams;
     bool sandboxMode;
     std::optional<std::string> matchName;
@@ -71,6 +72,8 @@ struct Turret {
 	std::optional<int> ticksToDoubleBullet;
 	/// Only in heavy tanks, not present in enemies
 	std::optional<int> ticksToLaser;
+	std::optional<int> ticksToHealingBullet;
+	std::optional<int> ticksToStunBullet;
 };
 
 enum class SecondaryItemType {
@@ -95,11 +98,15 @@ struct Tank {
 	std::optional<int> ticksToRadar;
 	/// Only in light tanks
 	std::optional<bool> isUsingRadar;
+	/// 2D array of chars ('0' or '1') same as tiles
+	std::optional<std::vector<std::vector<char>>> visibility;
 };
 
 enum class BulletType {
-    bullet = 0,
-    doubleBullet = 1
+    basic = 0,
+    doubleBullet = 1,
+	healing = 2,
+	stun = 3
 };
 
 /// BulletPayload struct
@@ -184,8 +191,6 @@ struct Map {
 	/// A 2D vector to hold variants of tile objects
 	std::vector<std::vector<Tile>> tiles;
 	std::vector<Zone> zones;
-    /// 2D array of chars ('0' or '1') same as tiles
-	std::vector<std::vector<char>> visibility;
 };
 
 /// GameState struct
@@ -193,6 +198,7 @@ struct GameState {
     /// tick number
 	int time;
 	std::vector<Team> teams;
+	std::optional<std::string> playerId;
 	Map map;
 };
 
@@ -221,7 +227,9 @@ enum class AbilityType {
     useLaser = 1,
 	fireDoubleBullet = 2,
     useRadar = 3,
-    dropMine = 4
+    dropMine = 4,
+	fireHealingBullet = 5,
+	fireStunBullet = 6,
 };
 
 struct AbilityUse {
